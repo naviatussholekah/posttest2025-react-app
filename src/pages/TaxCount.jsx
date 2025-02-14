@@ -23,7 +23,7 @@ export default function TaxCount() {
     if(formData.length === 0){
     localData.forEach((item) => setFormData(item));
     }
-  }, []);
+  }, [formData.length, setFormData]);
 
   const formatDate = (date) => {
     return date ? date.toLocaleDateString("en-GB") : "";
