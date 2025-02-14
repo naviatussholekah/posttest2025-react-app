@@ -1,55 +1,56 @@
 import useStore from "../stores/store";
 import { useState, useEffect } from "react";
 import { InputText } from "primereact/inputtext";
+import { InputNumber } from "primereact/inputnumber";
 import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Dialog } from "primereact/dialog";
-import Swal from 'sweetalert2';
+import Swal from "sweetalert2";
 
-export function TaxCount() {
-  const { formData, setFormData, deleteFormData } = useStore();
-  const [localFormData, setLocalFormData] = useState({
-    nama: "",
-    jumlahProduk: "",
-    diskon: "",
-    pengeluaran: "",
-    tanggalPembelian: "",
-  });
+export default function TaxCount() {
+  const { formData, setFormData, deleteFormData, dynamicFields, users } =
+    useStore();
+  const [formState, setFormState] = useState({});
+  const [showForm, setShowForm] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
+  const [isFormValid, setIsFormValid] = useState(false);
+
+  useEffect(() => {
+    const localData = JSON.parse(localStorage.getItem("formData")) || [];
+    if(formData.length === 0){
+    localData.forEach((item) => setFormData(item));
+    }
+  }, []);
 
   const formatDate = (date) => {
     return date ? date.toLocaleDateString("en-GB") : "";
   };
-
-  const [showForm, setShowForm] = useState(false);
-  const [isEdit, setIsEdit] = useState(false);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setLocalFormData({ ...localFormData, [name]: value });
-  };
-
-  const user = [
-    { label: "User A", value: "User A" },
-    { label: "User B", value: "User B" },
-    { label: "User C", value: "User C" },
-  ];
 
   const handleHitungTaxClick = () => {
     setShowForm(true);
     setIsEdit(false);
   };
 
+  useEffect(() => {
+    const requiredFields = dynamicFields
+      .filter((el) => el.name !== "pajak" && el.name !== "diskon")
+      .map((el) => el.name);
+    const isValid = requiredFields.every(
+      (field) => formState[field] !== undefined && formState[field] !== "" && formState[field] !== null 
+    ) && formState.pengeluaran > 0;
+    setIsFormValid(isValid);
+  }, [formState, dynamicFields]);
+
   const handleEditData = (formData) => {
     setShowForm(true);
     setIsEdit(true);
-    setLocalFormData(formData);
+    setFormState(formData);
   };
 
   const [sysDate, setSysDate] = useState(new Date());
-
   useEffect(() => {
     const currentDate = new Date();
     setSysDate(currentDate);
@@ -58,46 +59,86 @@ export function TaxCount() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
+    const formattedDate = formatDate(new Date(formState.tanggalPembelian));
+
+    const pengeluaran = formState.pengeluaran;
+    const diskon = formState.diskon || 0;
+    const hargaAwal = (pengeluaran - diskon) / 1.11;
+    const pajak = pengeluaran - diskon - hargaAwal;
+
+    const formDatawithPpn = {
+      ...formState,
+      pajak: pajak,
+      diskon: diskon || 0,
+      id: isEdit ? formState.id : Date.now(),
+      tanggalPembelian: formattedDate,
+    };
+
     if (isEdit) {
-      useStore.getState().editFormData(localFormData);
+      useStore.getState().editFormData(formDatawithPpn);
     } else {
-      setFormData(localFormData);
+      setFormData(formDatawithPpn);
     }
 
-    setLocalFormData({
-      nama: "",
-      jumlahProduk: "",
-      diskon: "",
-      pengeluaran: "",
-      tanggalPembelian: "",
-    });
+    const dataLocalStorage = JSON.parse(localStorage.getItem("formData")) || [];
+
+    if (isEdit) {
+      const updatedData = dataLocalStorage.map((item) =>
+        item.id === formDatawithPpn.id ? formDatawithPpn : item
+      );
+      localStorage.setItem("formData", JSON.stringify(updatedData));
+    } else {
+      dataLocalStorage.push(formDatawithPpn);
+      localStorage.setItem("formData", JSON.stringify(dataLocalStorage));
+    }
+
+    setFormState({});
     setShowForm(false);
 
     Swal.fire({
-      icon: 'success',
-      title: 'Sukses!',
-      text: 'Data berhasil disimpan.',
-  });
+      icon: "success",
+      title: "Sukses!",
+      text: "Data berhasil disimpan.",
+    });
   };
 
   const handleCancel = () => {
-    setLocalFormData({
-      nama: "",
-      jumlahProduk: "",
-      diskon: "",
-      pengeluaran: "",
-      tanggalPembelian: "",
-    });
+    setFormState({});
     setShowForm(false);
+    setIsFormValid(false);
   };
 
-  useEffect(() => {
-    console.log("Updated formData: ", formData);
-  }, [formData]);
+  const handleDeleteFormData = (dataId) => {
+    Swal.fire({
+      title: "Apakah kamu yakin?",
+      text: "Data ini akan dihapus secara permanen!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Hapus",
+      cancelButtonText: "Batal",
+      dangerMode: true,
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const dataLocalStorage =
+          JSON.parse(localStorage.getItem("formData")) || [];
+        const deletedData = dataLocalStorage.filter(
+          (item) => item.id !== dataId
+        );
+        localStorage.setItem("formData", JSON.stringify(deletedData));
 
-  useEffect(() => {
-    console.log("Updated localFormData: ", localFormData);
-  }, [localFormData]);
+        deleteFormData(dataId);
+        Swal.fire({
+          icon: "success",
+          title: "Data telah terhapus!" 
+        });
+      } else {
+        Swal.fire({
+          icon: "success",
+          title: "Hapus data dibatalkan!"
+        });
+      }
+    });
+  };
 
   return (
     <div className="p-d-flex p-jc-center p-mt-5">
@@ -117,59 +158,29 @@ export function TaxCount() {
           rows={5}
           rowsPerPageOptions={[5, 10, 25]}
           header="Detail Pengeluaran"
+          keyField="id"
         >
-          <Column
-            field="user"
-            header="User"
-            sortable
-            headerStyle={{ backgroundColor: "#FF9800", color: "#fff" }}
-          />
-          <Column
-            field="nama"
-            header="Nama Produk"
-            sortable
-            headerStyle={{ backgroundColor: "#FF9800", color: "#fff" }}
-          />
-          <Column
-            field="jumlahProduk"
-            header="Jumlah Produk"
-            sortable
-            headerStyle={{ backgroundColor: "#FF9800", color: "#fff" }}
-          />
-          <Column
-            field="diskon"
-            header="Diskon"
-            sortable
-            headerStyle={{ backgroundColor: "#FF9800", color: "#fff" }}
-          />
-          <Column
-            field="pengeluaran"
-            header="Total Bayar (setelah diskon & pajak)"
-            sortable
-            headerStyle={{ backgroundColor: "#FF9800", color: "#fff" }}
-          />
-          <Column
-            body={(rowData) => {
-              return formatDate(new Date(rowData.tanggalPembelian));
-            }}
-            header="Tanggal Pembelian"
-            sortable
-            headerStyle={{ backgroundColor: "#FF9800", color: "#fff" }}
-          />
-          <Column
-            header="Total PPN yang dibayar"
-            body={(rowData) => {
-              const pengeluaran = rowData.pengeluaran;
-              const diskon = rowData.diskon;
+          {dynamicFields.map((field) => (
+            <Column
+              key={field.name}
+              field={field.name}
+              header={field.label}
+              sortable
+              headerStyle={{ backgroundColor: "#FF9800", color: "#fff" }}
+              body={(rowData) => {
+                let value = rowData[field.name];
+                
+                if (field.type === "number" && field.name !== "jumlahProduk") {
+                  value = new Intl.NumberFormat("id-ID", {
+                    style: "currency",
+                    currency: "IDR",
+                  }).format(value);
+                }
 
-              const hargaAwal = (pengeluaran - diskon) / 1.11;
-              const pajak = pengeluaran - diskon - hargaAwal;
-
-              return pajak;
-            }}
-            sortable
-            headerStyle={{ backgroundColor: "#FF9800", color: "#fff" }}
-          />
+                return value;
+              }}
+            />
+          ))}
           <Column
             header="Actions"
             body={(rowData) => (
@@ -182,7 +193,7 @@ export function TaxCount() {
                 <Button
                   icon="pi pi-trash"
                   className="p-button-danger"
-                  onClick={() => deleteFormData(rowData.id)}
+                  onClick={() => handleDeleteFormData(rowData.id)}
                 />
               </div>
             )}
@@ -202,6 +213,7 @@ export function TaxCount() {
               label="Submit"
               className="p-button-success"
               onClick={handleSubmit}
+              disabled={!isFormValid}
             />
             <Button
               label="Cancel"
@@ -212,100 +224,91 @@ export function TaxCount() {
         }
       >
         <div className="p-grid p-fluid">
-          <div className="p-field p-grid">
-            <label className="p-col-fixed" style={{ width: "140px" }}>
-              User:
-            </label>
-            <div className="p-col">
-              <Dropdown
-                name="user"
-                value={localFormData.user}
-                options={user}
-                onChange={(e) =>
-                  setLocalFormData({ ...localFormData, user: e.value })
-                }
-                required
-              />
-            </div>
-          </div>
-          <div className="p-field p-grid">
-            <label className="p-col-fixed" style={{ width: "140px" }}>
-              Nama Produk:
-            </label>
-            <div className="p-col">
-              <InputText
-                name="nama"
-                value={localFormData.nama}
-                onChange={handleChange}
-                placeholder="Nama Produk"
-                required
-              />
-            </div>
-          </div>
-          <div className="p-field p-grid">
-            <label className="p-col-fixed" style={{ width: "140px" }}>
-              Jumlah Produk:
-            </label>
-            <div className="p-col">
-              <InputText
-                name="jumlahProduk"
-                type="number"
-                value={localFormData.jumlahProduk}
-                onChange={handleChange}
-                placeholder="Jumlah produk yang dibeli"
-                min="1"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="p-field p-grid">
-            <label className="p-col-fixed" style={{ width: "140px" }}>
-              Diskon Produk:
-            </label>
-            <div className="p-col">
-              <InputText
-                name="diskon"
-                type="number"
-                value={localFormData.diskon}
-                onChange={handleChange}
-                placeholder="Diskon Produk"
-                min="0"
-              />
-            </div>
-          </div>
-
-          <div className="p-field p-grid">
-            <label className="p-col-fixed" style={{ width: "140px" }}>
-              Total Bayar:
-            </label>
-            <div className="p-col">
-              <InputText
-                name="pengeluaran"
-                type="number"
-                value={localFormData.pengeluaran}
-                onChange={handleChange}
-                placeholder="Total Bayar"
-                min="1"
-                required
-              />
-            </div>
-          </div>
-          <div className="p-field p-grid">
-            <label className="p-col-fixed" style={{ width: "140px" }}>
-              Tanggal Pembelian:
-            </label>
-            <div className="p-col">
-              <Calendar
-                name="tanggalPembelian"
-                value={localFormData.tanggalPembelian}
-                onChange={handleChange}
-                placeholder="Pilih Tanggal Pembelian"
-                maxDate={sysDate}
-                required
-              />
-            </div>
-          </div>
+          {dynamicFields
+            .filter((el) => el.name !== "pajak")
+            .map((field) => (
+              <div key={field.name} className="p-field p-grid">
+                <label className="p-col-fixed" style={{ width: "140px" }}>
+                  {field.label}:
+                </label>
+                <div className="p-col">
+                  {field.type === "text" ? (
+                    <InputText
+                      name={field.name}
+                      type={field.type}
+                      value={formState[field.name] || ""}
+                      onChange={(e) =>
+                        setFormState({
+                          ...formState,
+                          [field.name]: e.target.value,
+                        })
+                      }
+                      placeholder={field.label}
+                      required
+                    />
+                  ) : field.type === "number" &&
+                    field.name === "jumlahProduk" ? (
+                    <InputNumber
+                      name={field.name}
+                      min={0}
+                      value={formState[field.name]}
+                      onChange={(e) =>
+                        setFormState({
+                          ...formState,
+                          [field.name]: e.value,
+                        })
+                      }
+                      placeholder={field.label}
+                      required
+                    />
+                  ) : field.type === "number" &&
+                    field.name !== "jumlahProduk" ? (
+                    <InputNumber
+                      name={field.name}
+                      inputId="currency-indonesia"
+                      value={formState[field.name] || 0}
+                      mode="currency"
+                      currency="IDR"
+                      locale="id-ID"
+                      min={0}
+                      onValueChange={(e) =>
+                        setFormState({
+                          ...formState,
+                          [field.name]: e.value === null || e.value === "" || e.value === 0 ? 0 : e.value,
+                        })
+                      }
+                      placeholder={field.label}
+                      required
+                    />
+                  ) : field.type === "date" ? (
+                    <Calendar
+                      name={field.name}
+                      value={formState[field.name] || ""}
+                      onChange={(e) =>
+                        setFormState({
+                          ...formState,
+                          [field.name]: e.target.value,
+                        })
+                      }
+                      placeholder={`Pilih ${field.label}`}
+                      maxDate={sysDate}
+                      required
+                    />
+                  ) : field.type === "dropdown" ? (
+                    <Dropdown
+                      name={field.name}
+                      value={formState[field.name]}
+                      options={users}
+                      onChange={(e) =>
+                        setFormState({ ...formState, [field.name]: e.value })
+                      }
+                      placeholder={`Pilih ${field.label}`}
+                      required
+                    />
+                  ) : null}
+                </div>
+              </div>
+            ))}
         </div>
       </Dialog>
     </div>

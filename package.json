@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "chart.js": "^4.4.7",
     "cra-template": "1.2.0",
     "nanoid": "^5.0.9",
     "posttest2025-react-app": "file:",

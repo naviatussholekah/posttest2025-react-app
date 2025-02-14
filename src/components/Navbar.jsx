@@ -12,13 +12,8 @@ export default function Navbar() {
       icon: "pi pi-home",
       command: () => navigate("/"),
     },
-    // {
-    //   label: "Manage Products",
-    //   icon: "pi pi-box",
-    //   command: () => navigate("/manageProducts"),
-    // },
     {
-      label: "Detail Pengeluaran",
+      label: "Hitung PPN",
       icon: "pi pi-calculator",
       command: () => navigate("/taxCount"),
     },
