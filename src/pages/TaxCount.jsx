@@ -40,7 +40,7 @@ export default function TaxCount() {
       .map((el) => el.name);
     const isValid = requiredFields.every(
       (field) => formState[field] !== undefined && formState[field] !== "" && formState[field] !== null 
-    ) && formState.pengeluaran > 0;
+    ) && formState.pengeluaran > 0 && (formState.pengeluaran > formState.diskon);
     setIsFormValid(isValid);
   }, [formState, dynamicFields]);
 
@@ -266,7 +266,7 @@ export default function TaxCount() {
                     <InputNumber
                       name={field.name}
                       inputId="currency-indonesia"
-                      value={formState[field.name] || 0}
+                      value={formState[field.name]}
                       mode="currency"
                       currency="IDR"
                       locale="id-ID"
@@ -274,7 +274,7 @@ export default function TaxCount() {
                       onValueChange={(e) =>
                         setFormState({
                           ...formState,
-                          [field.name]: e.value === null || e.value === "" || e.value === 0 ? 0 : e.value,
+                          [field.name]: e.value,
                         })
                       }
                       placeholder={field.label}
